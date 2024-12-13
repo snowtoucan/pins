@@ -9,10 +9,8 @@ let object;
 let controls;
 let objToRender = 'pika';
 
-// Initialize GLTFLoader
 const loader = new GLTFLoader();
 
-// Load the GLTF model
 loader.load(
     './assets/pika/model.gltf',
     function (gltf) {
@@ -28,12 +26,11 @@ loader.load(
 );
 
 const canvas = document.getElementById('container3D');
-const renderer = new THREE.WebGLRenderer({ canvas: canvas });  // Use the existing canvas
+const renderer = new THREE.WebGLRenderer({ canvas: canvas });
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 camera.position.z = objToRender === "pika" ? 25 : 500;
 
-// Lighting
 const topLight = new THREE.DirectionalLight(0xffffff, 1);
 topLight.position.set(500, 500, 500);
 topLight.castShadow = true;
@@ -42,22 +39,13 @@ scene.add(topLight);
 const ambientLight = new THREE.AmbientLight(0x333333, objToRender === "pika" ? 5 : 1);
 scene.add(ambientLight);
 
-// Initialize OrbitControls
 controls = new OrbitControls(camera, renderer.domElement);
 
 function animate() {
     requestAnimationFrame(animate);
-
-    // Update controls if they exist
-    if (controls) {
-        controls.update();  // Only needed if controls.enableDamping = true or controls.auto-rotate = true
-    }
-
-    // Render the scene
     renderer.render(scene, camera);
 }
 
-// Handle window resizing
 window.addEventListener("resize", function () {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
