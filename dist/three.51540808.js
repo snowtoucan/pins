@@ -46439,33 +46439,55 @@ var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHei
 var object;
 var controls;
 var objToRender = 'pika';
+
+// Initialize GLTFLoader
 var loader = new _GLTFLoader.GLTFLoader();
-loader.load("../assets/".concat(objToRender, "/scene.gltf"), function (gltf) {
+
+// Load the GLTF model
+loader.load('./assets/pika/model.gltf',
+// Ensure the path is correct
+function (gltf) {
   object = gltf.scene;
   scene.add(object);
 }, function (xhr) {
   console.log(xhr.loaded / xhr.total * 100 + '% loaded');
 }, function (error) {
-  console.error(error);
+  console.error('Error loading GLTF model:', error);
 });
-var renderer = new THREE.WebGLRenderer();
+var canvas = document.getElementById('container3D');
+var renderer = new THREE.WebGLRenderer({
+  canvas: canvas
+}); // Use the existing canvas
 renderer.setSize(window.innerWidth, window.innerHeight);
-document.getElementById("container3D").appendChild(renderer.domElement);
-camera.position.z = objToRender == "pika" ? 25 : 500;
+camera.position.z = objToRender === "pika" ? 25 : 500;
+
+// Lighting
 var topLight = new THREE.DirectionalLight(0xffffff, 1);
 topLight.position.set(500, 500, 500);
 topLight.castShadow = true;
 scene.add(topLight);
-var ambientLight = new THREE.AmbientLight(0x333333, objToRender == "pika" ? 5 : 1);
+var ambientLight = new THREE.AmbientLight(0x333333, objToRender === "pika" ? 5 : 1);
 scene.add(ambientLight);
+
+// Initialize OrbitControls
+controls = new _OrbitControls.OrbitControls(camera, renderer.domElement);
 function animate() {
   requestAnimationFrame(animate);
+
+  // Update controls if they exist
+  if (controls) {
+    controls.update(); // Only needed if controls.enableDamping = true or controls.auto-rotate = true
+  }
+
+  // Render the scene
   renderer.render(scene, camera);
 }
+
+// Handle window resizing
 window.addEventListener("resize", function () {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, this.window.innerHeight);
+  renderer.setSize(window.innerWidth, window.innerHeight);
 });
 animate();
 },{"../node_modules/three/build/three.module.js":"node_modules/three/build/three.module.js","../node_modules/three/examples/jsm/controls/OrbitControls.js":"node_modules/three/examples/jsm/controls/OrbitControls.js","../node_modules/three/examples/jsm/loaders/GLTFLoader.js":"node_modules/three/examples/jsm/loaders/GLTFLoader.js"}],"../../../../../../../opt/homebrew/lib/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
@@ -46493,7 +46515,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "50325" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "57724" + '/');
   ws.onmessage = function (event) {
     checkedAssets = {};
     assetsToAccept = [];
