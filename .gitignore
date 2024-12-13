@@ -1,0 +1,16 @@
+# Dependency directories
+node_modules/
+
+# Build output
+dist/
+
+# Optional, if you're using VS Code
+.vscode/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# macOS .DS_Store files
+.DS_Store
