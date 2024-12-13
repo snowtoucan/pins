@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from "three";
 import * as dat from "lil-gui";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -81,14 +81,14 @@ let model;
  */
 // Draco
 const dracoLoader = new DRACOLoader();
-dracoLoader.setDecoderPath("/draco/");
+dracoLoader.setDecoderPath("./draco/");
 
 // GLTF Loader
 const gltfLoader = new GLTFLoader();
 gltfLoader.setDRACOLoader(dracoLoader);
 
 // Load main model
-gltfLoader.load("/models/model.glb", (gltf) => {
+gltfLoader.load("./models/model.glb", (gltf) => {
   model = gltf.scene;
   console.log(model);
   scene.add(model);

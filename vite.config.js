@@ -1,19 +1,14 @@
-import vue from '@vitejs/plugin-vue';
-
-const isCodeSandbox = 'SANDBOX_URL' in process.env || 'CODESANDBOX_HOST' in process.env;
-
 export default {
     root: 'src/',
     publicDir: '../static/',
-    base: '/pins.github.io/',
-    plugins: [vue()], // Using the Vue plugin now
+    plugins: [], // Remove the Vue plugin
     server: {
-        host: true,
-        open: !isCodeSandbox // Open if it's not a CodeSandbox
+      host: true,
+      open: true // Always open the dev server, since Vue plugin is removed
     },
     build: {
-        outDir: '../dist',
-        emptyOutDir: true,
-        sourcemap: true
+      outDir: '../dist',
+      emptyOutDir: true,
+      sourcemap: true
     }
-};
+  };
