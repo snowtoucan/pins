@@ -4,6 +4,10 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 const canvas = document.querySelector("canvas.container3D");
 
+const fbValueElement = document.getElementById('fbValue');
+const lrValueElement = document.getElementById('lrValue');
+const csValueElement = document.getElementById('csValue');
+
 const scene = new THREE.Scene();
 
 const renderer = new THREE.WebGLRenderer({
@@ -59,8 +63,9 @@ const cubeMaterials = [
 const cube = new THREE.Mesh(cubeGeometry, cubeMaterials);
 const cubeCoordinates = { x: 0, y: 20, z: 0 }; // Initial coordinates
 const cubeVelocity = { x: 0, y: 0, z: 0 }; // Initial velocity
+let cubeSpeed = 1; // Initial speed (without components)
 const cubeAcceleration = 0.5;
-const maxSpeed = 6; // Max speed of the cube
+const maxCubeSpeed = 6; // Max speed of the cube
 const gravity = -50;
 cube.position.set(cubeCoordinates.x, cubeCoordinates.y, cubeCoordinates.z);
 scene.add(cube);
@@ -109,6 +114,11 @@ function rotateVector(vector, axis, angle) {
   vector.applyQuaternion(quaternion);        // Apply the rotation to the vector
 }
 
+function updateFBLRVector(angle) {
+  forwardVector.copy(getCameraDirection(camera)); // Forward relative to the camera
+  rotateVector(forwardVector, new THREE.Vector3(0, 1, 0), angle);
+}
+
 // Raycaster for ground collision detection
 const raycaster = new THREE.Raycaster();
 const rayDirection = new THREE.Vector3(0, -1, 0); // Downward direction
@@ -123,36 +133,50 @@ const animate = () => {
 
   orbitControls.update();
 
-  const angleFBLR = Math.atan2(fvFBLR.LR, fvFBLR.FB);
+  const angleFBLR = Math.atan2(-fvFBLR.LR, fvFBLR.FB);
 
-  // Movement update
-  if (moveForward && Math.abs(fvFBLR.FB) < fvMax) {
+  if (moveForward === moveBackward) {
+    if (Math.abs(fvFBLR.FB) < 2*fvAcceleration + 0.0001) {
+      fvFBLR.FB = 0
+    } else {
+    fvFBLR.FB = Math.sign(fvFBLR.FB) * (Math.abs(fvFBLR.FB) - 2*fvAcceleration);
+    updateFBLRVector(angleFBLR);
+    }
+  } else if (moveForward && ((Math.abs(fvFBLR.FB) < fvMax - 0.001) || fvFBLR.FB < 0)) {
     fvFBLR.FB += fvAcceleration;
-  } else if (moveBackward && Math.abs(fvFBLR.FB) < fvMax) {
+    updateFBLRVector(angleFBLR);
+  } else if (moveBackward && ((Math.abs(fvFBLR.FB) < fvMax - 0.001) || fvFBLR.FB > 0)) {
     fvFBLR.FB -= fvAcceleration;
+    updateFBLRVector(angleFBLR);
   }
-  if (moveLeft && Math.abs(fvFBLR.LR) < fvMax) {
+
+  if (moveLeft === moveRight) {
+    if (Math.abs(fvFBLR.LR) < 2*fvAcceleration + 0.0001) {
+      fvFBLR.LR = 0
+    } else {
+    fvFBLR.LR = Math.sign(fvFBLR.LR) * (Math.abs(fvFBLR.LR) - 2*fvAcceleration);
+    updateFBLRVector(angleFBLR);
+    }
+  } else if (moveRight && ((Math.abs(fvFBLR.LR) < fvMax - 0.001) || fvFBLR.LR < 0)) {
     fvFBLR.LR += fvAcceleration;
-  } else if (moveRight && Math.abs(fvFBLR.LR) < fvMax) {
+    updateFBLRVector(angleFBLR);
+  } else if (moveLeft && ((Math.abs(fvFBLR.LR) < fvMax - 0.001) || fvFBLR.LR > 0)) {
     fvFBLR.LR -= fvAcceleration;
-  }
+    updateFBLRVector(angleFBLR);
+  }  
   
-  const friction = fvAcceleration; // Apply some friction to decelerate movement gradually
-  if (!moveForward && !moveBackward) {
-    fvFBLR.FB = Math.abs(fvFBLR.FB) > friction ? fvFBLR.FB - Math.sign(fvFBLR.FB) * friction : 0;
-  }
-  if (!moveLeft && !moveRight) {
-    fvFBLR.LR = Math.abs(fvFBLR.LR) > friction ? fvFBLR.LR - Math.sign(fvFBLR.LR) * friction : 0;
+  if ((moveForward || moveBackward || moveLeft || moveRight) && (cubeSpeed < maxCubeSpeed - 0.0001)) {
+    cubeSpeed += cubeAcceleration;
+  } else if (moveForward || moveBackward || moveLeft || moveRight) {
+  } else if (Math.abs(cubeSpeed) < 2*cubeAcceleration + 0.0001) {
+    cubeSpeed = 0
+  } else {
+    cubeSpeed -= 2*cubeAcceleration;
   }
 
-  // Handle movement based on the key
-  if (moveForward || moveBackward || moveLeft || moveRight) {
-    forwardVector.copy(getCameraDirection(camera)); // Forward relative to the camera
-    rotateVector(forwardVector, new THREE.Vector3(0, 1, 0), angleFBLR);
-  }
+  cubeVelocity.x = forwardVector.x * cubeSpeed; // Need to multiply by velocity determined by how long keys have been pressed
+  cubeVelocity.z = forwardVector.z * cubeSpeed; // i think maybe have a function based on any key. automate 'cubevelocity
   
-  const currentSpeed = Math.sqrt(Math.pow(cubeVelocity.x, 2) + Math.pow(cubeVelocity.y, 2) + Math.pow(cubeVelocity.z, 2));
-
   cubeCoordinates.x += cubeVelocity.x * deltaTime;
   cubeCoordinates.y += cubeVelocity.y * deltaTime;
   cubeCoordinates.z += cubeVelocity.z * deltaTime;
@@ -185,6 +209,10 @@ const animate = () => {
   // Update the arrow position to match the cube's position
   arrowHelper.setDirection(forwardVector.clone().normalize());
   arrowHelper.position.set(cubeCoordinates.x, cubeCoordinates.y, cubeCoordinates.z); // Offset the arrow to center with the cube
+
+  fbValueElement.textContent = `FB: ${fvFBLR.FB.toFixed(2)}`;
+  lrValueElement.textContent = `LR: ${fvFBLR.LR.toFixed(2)}`;
+  csValueElement.textContent = `Speed: ${cubeSpeed.toFixed(2)}`;
 
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
