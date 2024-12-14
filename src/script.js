@@ -4,32 +4,6 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 const canvas = document.querySelector("canvas.container3D");
 
-// Coordinate display
-const coordinateDisplay = document.createElement("div");
-coordinateDisplay.style.position = "absolute";
-coordinateDisplay.style.top = "10px";
-coordinateDisplay.style.left = "10px";
-coordinateDisplay.style.color = "white";
-coordinateDisplay.style.fontFamily = "Arial, sans-serif";
-coordinateDisplay.style.fontSize = "16px";
-coordinateDisplay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-coordinateDisplay.style.padding = "5px 10px";
-coordinateDisplay.style.borderRadius = "5px";
-document.body.appendChild(coordinateDisplay);
-
-// FPS Counter
-const fpsDisplay = document.createElement("div");
-fpsDisplay.style.position = "absolute";
-fpsDisplay.style.top = "10px";
-fpsDisplay.style.right = "10px";
-fpsDisplay.style.color = "white";
-fpsDisplay.style.fontFamily = "Arial, sans-serif";
-fpsDisplay.style.fontSize = "16px";
-fpsDisplay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-fpsDisplay.style.padding = "5px 10px";
-fpsDisplay.style.borderRadius = "5px";
-document.body.appendChild(fpsDisplay);
-
 const scene = new THREE.Scene();
 
 const renderer = new THREE.WebGLRenderer({
@@ -40,7 +14,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const cameraOffset = new THREE.Vector3(0, 2, -5); // Adjust the position as needed
+camera.position.set(30, 20, 10);
 scene.add(camera);
 
 const onResize = () => {
@@ -51,16 +25,19 @@ const onResize = () => {
 window.addEventListener("resize", onResize);
 
 const orbitControls = new OrbitControls(camera, canvas);
-orbitControls.enableDamping = true;
+orbitControls.enableDamping = true; // Smooth camera movement
+orbitControls.dampingFactor = 0.25; // Adjust damping factor
+orbitControls.screenSpacePanning = true; // Enable panning
+orbitControls.maxPolarAngle = Math.PI / 2; // Limit vertical rotation
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
 directionalLight.position.set(5, 10, 5);
 scene.add(directionalLight);
 
-// Load ground model
+// Load ground GLTF
 const gltfLoader = new GLTFLoader();
 let groundMesh = null; // Store the ground mesh
-gltfLoader.load("./models/ground2.glb", (gltf) => {
+gltfLoader.load("./models/ground3.glb", (gltf) => {
   groundMesh = gltf.scene.children[0]; // Assume the first child is the ground
   groundMesh.geometry.computeBoundingBox(); // Ensure bounding box is computed
   groundMesh.geometry.computeBoundingSphere();
@@ -71,106 +48,143 @@ gltfLoader.load("./models/ground2.glb", (gltf) => {
 // Cube
 const cubeSize = 1;
 const cubeGeometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-const cubeMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-
-// Cube coordinates and physics properties
-const cubeCoordinates = { x: 0, y: 0, z: 5 }; // Start at z=5
-const velocity = { x: 0, y: 0, z: 0 }; // Initial velocity
-const gravity = -0.05; // Gravity acceleration
-
-// Position the cube
-cube.position.set(cubeCoordinates.x, cubeCoordinates.z, cubeCoordinates.y);
+const cubeMaterials = [
+  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // Red (Front)
+  new THREE.MeshBasicMaterial({ color: 0xff7f00 }), // Orange (Back)
+  new THREE.MeshBasicMaterial({ color: 0xffff00 }), // Yellow (Top)
+  new THREE.MeshBasicMaterial({ color: 0x00ff00 }), // Green (Bottom)
+  new THREE.MeshBasicMaterial({ color: 0x0000ff }), // Blue (Left)
+  new THREE.MeshBasicMaterial({ color: 0x800080 }), // Purple (Right)
+];
+const cube = new THREE.Mesh(cubeGeometry, cubeMaterials);
+const cubeCoordinates = { x: 0, y: 20, z: 0 }; // Initial coordinates
+const cubeVelocity = { x: 0, y: 0, z: 0 }; // Initial velocity
+const cubeAcceleration = 0.5;
+const maxSpeed = 6; // Max speed of the cube
+const gravity = -50;
+cube.position.set(cubeCoordinates.x, cubeCoordinates.y, cubeCoordinates.z);
 scene.add(cube);
 
-// Movement and rotation
-const moveSpeed = 0.1;
-const rotateSpeed = 0.05;
-let moveDirection = 0; // -1 for backward, 1 for forward
-let rotateDirection = 0; // -1 for left, 1 for right
+const forwardVector = new THREE.Vector3(0, 0, 1); // Initially pointing along the Z axis
+const origin = new THREE.Vector3(0, 0, 0);
+const arrowHelper = new THREE.ArrowHelper(forwardVector.clone().normalize(), origin, 5, 0x00ff00); // Length of 5, green color
+scene.add(arrowHelper);
 
-document.addEventListener("keydown", (event) => {
-  if (event.key === "w" || event.key === "W") moveDirection = 1;
-  if (event.key === "s" || event.key === "S") moveDirection = -1;
-  if (event.key === "a" || event.key === "A") rotateDirection = -1;
-  if (event.key === "d" || event.key === "D") rotateDirection = 1;
+const fvAcceleration = 0.1;
+const fvFBLR = { FB: 0, LR: 0 };
+const fvMax = 1;
+
+// Movement
+let moveForward = false;
+let moveBackward = false;
+let moveLeft = false;
+let moveRight = false;
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "w") moveForward = true;
+  if (event.key === "s") moveBackward = true;
+  if (event.key === "a") moveLeft = true;
+  if (event.key === "d") moveRight = true;
 });
 
-document.addEventListener("keyup", (event) => {
-  if (event.key === "w" || event.key === "W" || event.key === "s" || event.key === "S") moveDirection = 0;
-  if (event.key === "a" || event.key === "A" || event.key === "d" || event.key === "D") rotateDirection = 0;
+window.addEventListener("keyup", (event) => {
+  if (event.key === "w") moveForward = false;
+  if (event.key === "s") moveBackward = false;
+  if (event.key === "a") moveLeft = false;
+  if (event.key === "d") moveRight = false;
 });
+
+function getCameraDirection(camera) {
+  // Get the camera's forward direction and project it onto the XZ plane
+  const cameraDirection = new THREE.Vector3();
+  camera.getWorldDirection(cameraDirection); // Get the camera's forward direction
+  cameraDirection.y = 0; // Remove the Y component to keep movement in the horizontal plane
+  cameraDirection.normalize(); // Normalize the vector
+  return cameraDirection;
+}
+
+function rotateVector(vector, axis, angle) {
+  const quaternion = new THREE.Quaternion(); // Create a quaternion
+  quaternion.setFromAxisAngle(axis, angle);  // Define the rotation using axis and angle
+  vector.applyQuaternion(quaternion);        // Apply the rotation to the vector
+}
 
 // Raycaster for ground collision detection
 const raycaster = new THREE.Raycaster();
 const rayDirection = new THREE.Vector3(0, -1, 0); // Downward direction
 
-// FPS tracking
+// Timing
 let lastTime = performance.now();
-let frameCount = 0;
-let fps = 0;
 
 const animate = () => {
   const currentTime = performance.now();
   const deltaTime = (currentTime - lastTime) / 1000; // Time in seconds
   lastTime = currentTime;
 
-  frameCount++;
-  if (frameCount % 60 === 0) { // Update FPS every 60 frames
-    fps = Math.round(1 / deltaTime);
-    frameCount = 0;
-  }
-
   orbitControls.update();
 
-  // Apply gravity
-  velocity.z += gravity;
+  const angleFBLR = Math.atan2(fvFBLR.LR, fvFBLR.FB);
 
-  // Update cube's z position
-  cubeCoordinates.z += velocity.z;
+  // Movement update
+  if (moveForward && Math.abs(fvFBLR.FB) < fvMax) {
+    fvFBLR.FB += fvAcceleration;
+  } else if (moveBackward && Math.abs(fvFBLR.FB) < fvMax) {
+    fvFBLR.FB -= fvAcceleration;
+  }
+  if (moveLeft && Math.abs(fvFBLR.LR) < fvMax) {
+    fvFBLR.LR += fvAcceleration;
+  } else if (moveRight && Math.abs(fvFBLR.LR) < fvMax) {
+    fvFBLR.LR -= fvAcceleration;
+  }
+  
+  const friction = fvAcceleration; // Apply some friction to decelerate movement gradually
+  if (!moveForward && !moveBackward) {
+    fvFBLR.FB = Math.abs(fvFBLR.FB) > friction ? fvFBLR.FB - Math.sign(fvFBLR.FB) * friction : 0;
+  }
+  if (!moveLeft && !moveRight) {
+    fvFBLR.LR = Math.abs(fvFBLR.LR) > friction ? fvFBLR.LR - Math.sign(fvFBLR.LR) * friction : 0;
+  }
 
-  // Use raycaster to detect ground height
+  // Handle movement based on the key
+  if (moveForward || moveBackward || moveLeft || moveRight) {
+    forwardVector.copy(getCameraDirection(camera)); // Forward relative to the camera
+    rotateVector(forwardVector, new THREE.Vector3(0, 1, 0), angleFBLR);
+  }
+  
+  const currentSpeed = Math.sqrt(Math.pow(cubeVelocity.x, 2) + Math.pow(cubeVelocity.y, 2) + Math.pow(cubeVelocity.z, 2));
+
+  cubeCoordinates.x += cubeVelocity.x * deltaTime;
+  cubeCoordinates.y += cubeVelocity.y * deltaTime;
+  cubeCoordinates.z += cubeVelocity.z * deltaTime;
+
   if (groundMesh) {
     raycaster.set(
-      new THREE.Vector3(cubeCoordinates.x, cubeCoordinates.z + cubeSize / 2, cubeCoordinates.y),
+      new THREE.Vector3(cubeCoordinates.x, cubeCoordinates.y + cubeSize / 2, cubeCoordinates.z),
       rayDirection
     );
     const intersects = raycaster.intersectObject(groundMesh);
     if (intersects.length > 0) {
       const groundHeight = intersects[0].point.y;
 
-      // Collision detection with the ground
-      if (cubeCoordinates.z - cubeSize / 2 <= groundHeight) {
-        cubeCoordinates.z = groundHeight + cubeSize / 2; // Stop at ground level
-        velocity.z = 0; // No bouncing
+      // Collision detection with a small tolerance buffer
+      if (cubeCoordinates.y - cubeSize / 2 <= groundHeight) {
+        cubeCoordinates.y = groundHeight + cubeSize / 2; // Adjust position slightly above the ground
+        cubeVelocity.y = 0; // No bouncing, zero out vertical velocity
+      } else {
+        cubeVelocity.y += gravity * deltaTime; // Falling
       }
     }
   }
 
-  // Update rotation
-  cube.rotation.y -= rotateDirection * rotateSpeed;
+  // Update cube
+  const targetForward = new THREE.Vector3(forwardVector.x, 0, forwardVector.z).normalize(); // XZ plane only
+  const targetAngle = Math.atan2(targetForward.x, targetForward.z); // Angle in radians
+  cube.rotation.set(0, targetAngle, 0); // Fixes to horizontal rotation only (ignores tilt from Y)
+  cube.position.set(cubeCoordinates.x, cubeCoordinates.y, cubeCoordinates.z);
 
-  // Update position (forward/backward in local direction)
-  if (moveDirection !== 0) {
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cube.quaternion); // Local forward direction
-    cubeCoordinates.x += forward.x * moveSpeed * moveDirection;
-    cubeCoordinates.y += forward.z * moveSpeed * moveDirection; // Adjust for THREE.js coordinate system
-  }
-
-  // Update cube's position
-  cube.position.set(cubeCoordinates.x, cubeCoordinates.z, cubeCoordinates.y);
-
-  // Update camera position behind the cube
-  camera.position.copy(cube.position).add(cameraOffset); // Move the camera behind the cube
-  camera.lookAt(cube.position); // Make the camera look at the cube
-
-  // Update coordinate display with angle between 0 and 360 degrees
-  let angle = THREE.MathUtils.radToDeg(cube.rotation.y);
-  angle = (angle + 360) % 360; // Normalize the angle between 0 and 360
-  coordinateDisplay.innerText = `x: ${cubeCoordinates.x.toFixed(2)}, y: ${cubeCoordinates.y.toFixed(2)}, z: ${cubeCoordinates.z.toFixed(2)}, Angle: ${angle.toFixed(2)}º`;
-
-  // Update FPS display
-  fpsDisplay.innerText = `FPS: ${fps}`;
+  // Update the arrow position to match the cube's position
+  arrowHelper.setDirection(forwardVector.clone().normalize());
+  arrowHelper.position.set(cubeCoordinates.x, cubeCoordinates.y, cubeCoordinates.z); // Offset the arrow to center with the cube
 
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
