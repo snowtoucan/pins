@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 const canvas = document.querySelector("canvas.container3D");
@@ -18,7 +17,8 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(30, 20, 10);
+camera.position.set(0, 10, 0);
+const offset = new THREE.Vector3(0, 3, -6); // Adjust these values for position relative to the cube
 scene.add(camera);
 
 const onResize = () => {
@@ -27,12 +27,6 @@ const onResize = () => {
   camera.updateProjectionMatrix();
 };
 window.addEventListener("resize", onResize);
-
-const orbitControls = new OrbitControls(camera, canvas);
-orbitControls.enableDamping = true; // Smooth camera movement
-orbitControls.dampingFactor = 0.25; // Adjust damping factor
-orbitControls.screenSpacePanning = true; // Enable panning
-orbitControls.maxPolarAngle = Math.PI / 2; // Limit vertical rotation
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
 directionalLight.position.set(5, 10, 5);
@@ -131,8 +125,6 @@ const animate = () => {
   const deltaTime = (currentTime - lastTime) / 1000; // Time in seconds
   lastTime = currentTime;
 
-  orbitControls.update();
-
   const angleFBLR = Math.atan2(-fvFBLR.LR, fvFBLR.FB);
 
   if (moveForward === moveBackward) {
@@ -165,13 +157,23 @@ const animate = () => {
     updateFBLRVector(angleFBLR);
   }  
   
-  if ((moveForward || moveBackward || moveLeft || moveRight) && (cubeSpeed < maxCubeSpeed - 0.0001)) {
-    cubeSpeed += cubeAcceleration;
-  } else if (moveForward || moveBackward || moveLeft || moveRight) {
-  } else if (Math.abs(cubeSpeed) < 2*cubeAcceleration + 0.0001) {
-    cubeSpeed = 0
-  } else {
-    cubeSpeed -= 2*cubeAcceleration;
+  if ((moveForward ^ moveBackward) || (moveLeft ^ moveRight)) { // Single key pressed in either direction
+    if (cubeSpeed < maxCubeSpeed - 0.0001) {
+      cubeSpeed += cubeAcceleration;
+    }
+  } else if ((moveForward && moveBackward && !(moveLeft || moveRight)) || // Both forward/backward, but no left/right
+             (moveLeft && moveRight && !(moveForward || moveBackward))) { // Both left/right, but no forward/backward
+    if (Math.abs(cubeSpeed) < 2 * cubeAcceleration + 0.0001) {
+      cubeSpeed = 0; // Fully stop when close to 0 speed
+    } else {
+      cubeSpeed -= 2 * cubeAcceleration; // Decelerate
+    }
+  } else if (!(moveForward || moveBackward || moveLeft || moveRight)) { // No keys pressed
+    if (Math.abs(cubeSpeed) < 2 * cubeAcceleration + 0.0001) {
+      cubeSpeed = 0; // Fully stop when close to 0 speed
+    } else {
+      cubeSpeed -= 2 * cubeAcceleration; // Decelerate
+    }
   }
 
   cubeVelocity.x = forwardVector.x * cubeSpeed; // Need to multiply by velocity determined by how long keys have been pressed
@@ -205,6 +207,14 @@ const animate = () => {
   const targetAngle = Math.atan2(targetForward.x, targetForward.z); // Angle in radians
   cube.rotation.set(0, targetAngle, 0); // Fixes to horizontal rotation only (ignores tilt from Y)
   cube.position.set(cubeCoordinates.x, cubeCoordinates.y, cubeCoordinates.z);
+
+  const targetPosition = new THREE.Vector3(
+    cubeCoordinates.x + offset.x,
+    cubeCoordinates.y + offset.y,
+    cubeCoordinates.z + offset.z
+  );
+  camera.position.lerp(targetPosition, 0.1); // Smoothly transition to the target position
+  camera.lookAt(cube.position); // Keep the camera looking at the cube
 
   // Update the arrow position to match the cube's position
   arrowHelper.setDirection(forwardVector.clone().normalize());
