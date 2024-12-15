@@ -69,8 +69,9 @@ const origin = new THREE.Vector3(0, 0, 0);
 const arrowHelper = new THREE.ArrowHelper(forwardVector.clone().normalize(), origin, 5, 0x00ff00); // Length of 5, green color
 scene.add(arrowHelper);
 
-const fvAcceleration = 0.1;
+const fvAcceleration = 0.05;
 const fvFBLR = { FB: 0, LR: 0 };
+let angleFBLR = 0;
 const fvMax = 1;
 
 // Movement
@@ -125,7 +126,12 @@ const animate = () => {
   const deltaTime = (currentTime - lastTime) / 1000; // Time in seconds
   lastTime = currentTime;
 
-  const angleFBLR = Math.atan2(-fvFBLR.LR, fvFBLR.FB);
+  if (fvFBLR.FB !== 0 || fvFBLR.LR !== 0) {
+    angleFBLR = Math.atan2(-fvFBLR.LR, fvFBLR.FB);
+  } else {
+
+  }
+  
 
   if (moveForward === moveBackward) {
     if (Math.abs(fvFBLR.FB) < 2*fvAcceleration + 0.0001) {
