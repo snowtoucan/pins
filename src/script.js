@@ -17,8 +17,8 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 10, 0);
-const offset = new THREE.Vector3(0, 3, -6); // Adjust these values for position relative to the cube
+let cameraPos = { x: 0, y: 3, z: 6 };
+let cameraYOffset = 1.7;
 scene.add(camera);
 
 const onResize = () => {
@@ -58,7 +58,7 @@ const cube = new THREE.Mesh(cubeGeometry, cubeMaterials);
 const cubeCoordinates = { x: 0, y: 20, z: 0 }; // Initial coordinates
 const cubeVelocity = { x: 0, y: 0, z: 0 }; // Initial velocity
 let cubeSpeed = 1; // Initial speed (without components)
-const cubeAcceleration = 0.5;
+const cubeAcceleration = 0.4;
 const maxCubeSpeed = 6; // Max speed of the cube
 const gravity = -50;
 cube.position.set(cubeCoordinates.x, cubeCoordinates.y, cubeCoordinates.z);
@@ -132,14 +132,11 @@ const animate = () => {
       fvFBLR.FB = 0
     } else {
     fvFBLR.FB = Math.sign(fvFBLR.FB) * (Math.abs(fvFBLR.FB) - 2*fvAcceleration);
-    updateFBLRVector(angleFBLR);
     }
   } else if (moveForward && ((Math.abs(fvFBLR.FB) < fvMax - 0.001) || fvFBLR.FB < 0)) {
     fvFBLR.FB += fvAcceleration;
-    updateFBLRVector(angleFBLR);
   } else if (moveBackward && ((Math.abs(fvFBLR.FB) < fvMax - 0.001) || fvFBLR.FB > 0)) {
     fvFBLR.FB -= fvAcceleration;
-    updateFBLRVector(angleFBLR);
   }
 
   if (moveLeft === moveRight) {
@@ -147,14 +144,11 @@ const animate = () => {
       fvFBLR.LR = 0
     } else {
     fvFBLR.LR = Math.sign(fvFBLR.LR) * (Math.abs(fvFBLR.LR) - 2*fvAcceleration);
-    updateFBLRVector(angleFBLR);
     }
   } else if (moveRight && ((Math.abs(fvFBLR.LR) < fvMax - 0.001) || fvFBLR.LR < 0)) {
     fvFBLR.LR += fvAcceleration;
-    updateFBLRVector(angleFBLR);
   } else if (moveLeft && ((Math.abs(fvFBLR.LR) < fvMax - 0.001) || fvFBLR.LR > 0)) {
     fvFBLR.LR -= fvAcceleration;
-    updateFBLRVector(angleFBLR);
   }  
   
   if ((moveForward ^ moveBackward) || (moveLeft ^ moveRight)) { // Single key pressed in either direction
@@ -163,22 +157,27 @@ const animate = () => {
     }
   } else if ((moveForward && moveBackward && !(moveLeft || moveRight)) || // Both forward/backward, but no left/right
              (moveLeft && moveRight && !(moveForward || moveBackward))) { // Both left/right, but no forward/backward
-    if (Math.abs(cubeSpeed) < 2 * cubeAcceleration + 0.0001) {
+    if (Math.abs(cubeSpeed) < 2*cubeAcceleration + 0.0001) {
       cubeSpeed = 0; // Fully stop when close to 0 speed
     } else {
-      cubeSpeed -= 2 * cubeAcceleration; // Decelerate
+      cubeSpeed -= 2*cubeAcceleration; // Decelerate
     }
   } else if (!(moveForward || moveBackward || moveLeft || moveRight)) { // No keys pressed
-    if (Math.abs(cubeSpeed) < 2 * cubeAcceleration + 0.0001) {
+    if (Math.abs(cubeSpeed) < 2*cubeAcceleration + 0.0001) {
       cubeSpeed = 0; // Fully stop when close to 0 speed
     } else {
-      cubeSpeed -= 2 * cubeAcceleration; // Decelerate
+      cubeSpeed -= 2*cubeAcceleration; // Decelerate
     }
   }
 
+  updateFBLRVector(angleFBLR);
+
   cubeVelocity.x = forwardVector.x * cubeSpeed; // Need to multiply by velocity determined by how long keys have been pressed
   cubeVelocity.z = forwardVector.z * cubeSpeed; // i think maybe have a function based on any key. automate 'cubevelocity
-  
+
+  cameraPos.x += Math.abs(fvFBLR.FB) * cubeVelocity.x * deltaTime;
+  cameraPos.z += Math.abs(fvFBLR.FB) * cubeVelocity.z * deltaTime;
+
   cubeCoordinates.x += cubeVelocity.x * deltaTime;
   cubeCoordinates.y += cubeVelocity.y * deltaTime;
   cubeCoordinates.z += cubeVelocity.z * deltaTime;
@@ -193,7 +192,7 @@ const animate = () => {
       const groundHeight = intersects[0].point.y;
 
       // Collision detection with a small tolerance buffer
-      if (cubeCoordinates.y - cubeSize / 2 <= groundHeight) {
+      if (cubeCoordinates.y - cubeSize / 2 <= groundHeight + 0.001) {
         cubeCoordinates.y = groundHeight + cubeSize / 2; // Adjust position slightly above the ground
         cubeVelocity.y = 0; // No bouncing, zero out vertical velocity
       } else {
@@ -208,13 +207,10 @@ const animate = () => {
   cube.rotation.set(0, targetAngle, 0); // Fixes to horizontal rotation only (ignores tilt from Y)
   cube.position.set(cubeCoordinates.x, cubeCoordinates.y, cubeCoordinates.z);
 
-  const targetPosition = new THREE.Vector3(
-    cubeCoordinates.x + offset.x,
-    cubeCoordinates.y + offset.y,
-    cubeCoordinates.z + offset.z
-  );
-  camera.position.lerp(targetPosition, 0.1); // Smoothly transition to the target position
-  camera.lookAt(cube.position); // Keep the camera looking at the cube
+  camera.position.setX(cameraPos.x);
+  camera.position.setY(cubeCoordinates.y + cameraPos.y);
+  camera.position.setZ(cameraPos.z);
+  camera.lookAt(cubeCoordinates.x, (cubeCoordinates.y + cameraYOffset), cubeCoordinates.z); // Keep the camera looking at the cube
 
   // Update the arrow position to match the cube's position
   arrowHelper.setDirection(forwardVector.clone().normalize());
